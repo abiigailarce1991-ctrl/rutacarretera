@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RutaCarretera CDMX – Navegación para Transporte Carretero</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root {
+    --verde: #1B5E20;
+    --verde-medio: #2E7D32;
+    --verde-claro: #43A047;
+    --verde-suave: #E8F5E9;
+    --naranja: #E65100;
+    --naranja-claro: #FF6F00;
+    --amarillo: #F9A825;
+    --rojo: #C62828;
+    --gris-oscuro: #212121;
+    --gris-medio: #424242;
+    --gris-claro: #F5F5F5;
+    --blanco: #FFFFFF;
+    --sombra: 0 2px 12px rgba(0,0,0,0.13);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #ECEFF1; color: var(--gris-oscuro); height: 100vh; display: flex; flex-direction: column; }
+
+  /* HEADER */
+  header {
+    background: linear-gradient(135deg, var(--verde) 0%, var(--verde-medio) 100%);
+    color: white; padding: 0 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 58px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); z-index: 1000; flex-shrink: 0;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { font-size: 26px; }
+  .logo-text { font-size: 20px; font-weight: 700; letter-spacing: 0.5px; }
+  .logo-sub { font-size: 11px; opacity: 0.8; font-weight: 400; }
+  .header-right { display: flex; align-items: center; gap: 14px; }
+  .header-btn { background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.3); color: white; border-radius: 20px; padding: 5px 14px; font-size: 13px; cursor: pointer; transition: background 0.2s; }
+  .header-btn:hover { background: rgba(255,255,255,0.3); }
+  .badge-operador { background: var(--amarillo); color: var(--gris-oscuro); border-radius: 12px; padding: 3px 10px; font-size: 12px; font-weight: 700; }
+
+  /* LAYOUT PRINCIPAL */
+  .main { display: flex; flex: 1; overflow: hidden; }
+
+  /* PANEL IZQUIERDO */
+  .panel { width: 340px; background: white; display: flex; flex-direction: column; overflow-y: auto; box-shadow: 2px 0 8px rgba(0,0,0,0.1); z-index: 500; flex-shrink: 0; }
+  .panel-tabs { display: flex; background: var(--gris-claro); border-bottom: 2px solid #E0E0E0; }
+  .tab { flex: 1; padding: 11px 5px; text-align: center; font-size: 12px; font-weight: 600; cursor: pointer; color: #757575; border-bottom: 3px solid transparent; transition: all 0.2s; }
+  .tab.active { color: var(--verde-medio); border-bottom-color: var(--verde-medio); background: white; }
+  .tab:hover:not(.active) { background: #EEEEEE; }
+  .tab-content { display: none; padding: 16px; }
+  .tab-content.active { display: block; }
+
+  /* BÚSQUEDA */
+  .search-group { margin-bottom: 12px; }
+  .search-label { font-size: 11px; font-weight: 700; color: var(--verde-medio); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; display: flex; align-items: center; gap: 5px; }
+  .search-input { width: 100%; border: 1.5px solid #BDBDBD; border-radius: 8px; padding: 9px 12px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+  .search-input:focus { border-color: var(--verde-claro); }
+  .btn-ruta { width: 100%; background: linear-gradient(135deg, var(--verde-medio), var(--verde-claro)); color: white; border: none; border-radius: 8px; padding: 11px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 6px; transition: opacity 0.2s; box-shadow: var(--sombra); }
+  .btn-ruta:hover { opacity: 0.9; }
+
+  .opciones-ruta { margin-top: 14px; }
+  .opcion-titulo { font-size: 12px; font-weight: 700; color: #616161; margin-bottom: 8px; }
+  .opcion-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+  .opcion-btn { border: 1.5px solid #BDBDBD; background: white; border-radius: 16px; padding: 5px 12px; font-size: 12px; cursor: pointer; color: #424242; transition: all 0.2s; }
+  .opcion-btn.sel { border-color: var(--verde-medio); background: var(--verde-suave); color: var(--verde-medio); font-weight: 700; }
+
+  /* RUTA RESULTADO */
+  .ruta-resultado { background: var(--verde-suave); border: 1.5px solid #A5D6A7; border-radius: 10px; padding: 12px; margin-top: 12px; display: none; }
+  .ruta-resultado.show { display: block; }
+  .ruta-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .ruta-dato { text-align: center; }
+  .ruta-dato .valor { font-size: 22px; font-weight: 800; color: var(--verde-medio); }
+  .ruta-dato .unidad { font-size: 11px; color: #616161; }
+  .btn-iniciar { width: 100%; background: var(--naranja); color: white; border: none; border-radius: 8px; padding: 10px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+  .btn-iniciar:hover { background: var(--naranja-claro); }
+
+  /* ALERTAS */
+  .alertas-lista { display: flex; flex-direction: column; gap: 8px; }
+  .alerta-item { border-radius: 8px; padding: 10px 12px; display: flex; align-items: flex-start; gap: 10px; border-left: 4px solid; }
+  .alerta-item.roja { background: #FFEBEE; border-color: var(--rojo); }
+  .alerta-item.amarilla { background: #FFFDE7; border-color: var(--amarillo); }
+  .alerta-item.azul { background: #E3F2FD; border-color: #1565C0; }
+  .alerta-item.naranja { background: #FFF3E0; border-color: var(--naranja); }
+  .alerta-icono { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+  .alerta-texto { font-size: 13px; }
+  .alerta-texto strong { display: block; font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+
+  /* PERFIL */
+  .perfil-seccion { margin-bottom: 16px; }
+  .perfil-titulo { font-size: 13px; font-weight: 700; color: var(--verde-medio); margin-bottom: 8px; border-bottom: 1px solid #E0E0E0; padding-bottom: 5px; }
+  .perfil-campo { display: flex; flex-direction: column; margin-bottom: 10px; }
+  .perfil-campo label { font-size: 11px; font-weight: 600; color: #616161; margin-bottom: 4px; }
+  .perfil-campo input, .perfil-campo select { border: 1.5px solid #BDBDBD; border-radius: 6px; padding: 7px 10px; font-size: 13px; outline: none; }
+  .perfil-campo input:focus, .perfil-campo select:focus { border-color: var(--verde-claro); }
+  .campo-row { display: flex; gap: 8px; }
+  .campo-row .perfil-campo { flex: 1; }
+  .restriccion-badge { display: inline-block; background: #FFEBEE; color: var(--rojo); border-radius: 10px; padding: 3px 10px; font-size: 11px; font-weight: 700; margin: 2px; }
+  .restriccion-badge.ok { background: var(--verde-suave); color: var(--verde-medio); }
+  .btn-guardar { width: 100%; background: var(--verde-medio); color: white; border: none; border-radius: 8px; padding: 10px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+
+  /* SERVICIOS */
+  .servicios-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .servicio-btn { background: var(--gris-claro); border: 1.5px solid #E0E0E0; border-radius: 10px; padding: 14px 8px; text-align: center; cursor: pointer; transition: all 0.2s; }
+  .servicio-btn:hover { background: var(--verde-suave); border-color: var(--verde-claro); }
+  .servicio-icono { font-size: 26px; margin-bottom: 4px; }
+  .servicio-label { font-size: 12px; font-weight: 600; color: #424242; }
+
+  /* HISTORIAL */
+  .historial-item { border-radius: 8px; background: var(--gris-claro); padding: 10px 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; cursor: pointer; border: 1.5px solid transparent; transition: all 0.2s; }
+  .historial-item:hover { border-color: var(--verde-claro); background: var(--verde-suave); }
+  .hist-icono { font-size: 20px; }
+  .hist-texto { font-size: 13px; }
+  .hist-texto strong { display: block; }
+  .hist-fecha { font-size: 11px; color: #9E9E9E; }
+
+  /* MAPA */
+  #mapa { flex: 1; z-index: 1; }
+
+  /* PANEL DE NAVEGACION ACTIVA */
+  .nav-activa { position: absolute; top: 70px; right: 16px; width: 260px; background: white; border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,0.18); z-index: 800; display: none; overflow: hidden; }
+  .nav-activa.show { display: block; }
+  .nav-header { background: linear-gradient(135deg, var(--verde) 0%, var(--verde-medio) 100%); color: white; padding: 12px 16px; }
+  .nav-indicacion { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+  .nav-distancia { font-size: 12px; opacity: 0.9; }
+  .nav-progreso { padding: 12px 16px; }
+  .progreso-barra { height: 6px; background: #E0E0E0; border-radius: 3px; margin-bottom: 10px; overflow: hidden; }
+  .progreso-fill { height: 100%; background: var(--verde-claro); border-radius: 3px; width: 35%; transition: width 0.5s; }
+  .nav-datos { display: flex; justify-content: space-between; font-size: 13px; color: #424242; }
+  .nav-dato strong { display: block; font-size: 17px; font-weight: 800; color: var(--verde-medio); }
+  .btn-terminar { width: 100%; background: var(--rojo); color: white; border: none; padding: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+  /* REPORTAR INCIDENTE */
+  .reporte-float { position: absolute; bottom: 30px; right: 16px; z-index: 800; }
+  .btn-reporte { background: var(--naranja); color: white; border: none; border-radius: 50%; width: 52px; height: 52px; font-size: 22px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,0.25); transition: transform 0.2s; }
+  .btn-reporte:hover { transform: scale(1.1); }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2000; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: white; border-radius: 14px; padding: 24px; width: 320px; max-width: 90vw; }
+  .modal h3 { color: var(--verde-medio); margin-bottom: 14px; font-size: 17px; }
+  .modal-opt { padding: 10px 12px; border-radius: 8px; border: 1.5px solid #E0E0E0; margin-bottom: 8px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+  .modal-opt:hover { background: var(--verde-suave); border-color: var(--verde-claro); }
+  .modal-btns { display: flex; gap: 8px; margin-top: 8px; }
+  .btn-cancelar { flex: 1; background: #EEE; border: none; border-radius: 8px; padding: 10px; font-size: 14px; cursor: pointer; }
+  .btn-enviar { flex: 1; background: var(--verde-medio); color: white; border: none; border-radius: 8px; padding: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: var(--gris-oscuro); color: white; border-radius: 24px; padding: 12px 22px; font-size: 14px; z-index: 3000; opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+
+  /* INFO CASETA */
+  .caseta-popup { background: white; border-radius: 10px; padding: 10px 14px; font-size: 13px; min-width: 160px; }
+  .caseta-popup strong { color: var(--verde-medio); display: block; margin-bottom: 4px; }
+
+  @media (max-width: 700px) {
+    .panel { width: 100%; max-height: 45vh; position: absolute; bottom: 0; left: 0; right: 0; border-radius: 16px 16px 0 0; }
+    .main { position: relative; }
+    #mapa { position: absolute; inset: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-icon">🛣️</span>
+    <div>
+      <div class="logo-text">RutaCarretera</div>
+      <div class="logo-sub">Navegación para Transporte Carretero · CDMX</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="badge-operador">🚛 Operador</span>
+    <button class="header-btn" onclick="toggleHistorial()">📋 Historial</button>
+    <button class="header-btn" onclick="showTab('perfil')">⚙️ Perfil</button>
+  </div>
+</header>
+
+<div class="main">
+  <!-- PANEL IZQUIERDO -->
+  <div class="panel" id="panel">
+    <div class="panel-tabs">
+      <div class="tab active" onclick="showTab('ruta')" id="tab-ruta">🗺️ Ruta</div>
+      <div class="tab" onclick="showTab('alertas')" id="tab-alertas">⚠️ Alertas</div>
+      <div class="tab" onclick="showTab('perfil')" id="tab-perfil">🚛 Vehículo</div>
+      <div class="tab" onclick="showTab('servicios')" id="tab-servicios">🔧 Servicios</div>
+    </div>
+
+    <!-- TAB RUTA -->
+    <div class="tab-content active" id="content-ruta">
+      <div class="search-group">
+        <div class="search-label">📍 Origen</div>
+        <input class="search-input" id="origen" type="text" placeholder="Tu ubicación actual" value="Terminal Vallejo, CDMX">
+      </div>
+      <div class="search-group">
+        <div class="search-label">🏁 Destino</div>
+        <input class="search-input" id="destino" type="text" placeholder="¿A dónde vas?">
+      </div>
+      <div class="opciones-ruta">
+        <div class="opcion-titulo">Tipo de ruta:</div>
+        <div class="opcion-btns">
+          <button class="opcion-btn sel" onclick="selOpt(this,'tipo')">⚡ Más rápida</button>
+          <button class="opcion-btn" onclick="selOpt(this,'tipo')">📏 Más corta</button>
+          <button class="opcion-btn" onclick="selOpt(this,'tipo')">🪙 Sin casetas</button>
+        </div>
+      </div>
+      <div class="opciones-ruta" style="margin-top:10px;">
+        <div class="opcion-titulo">Evitar:</div>
+        <div class="opcion-btns">
+          <button class="opcion-btn" onclick="toggleOpt(this)">🚧 Obras</button>
+          <button class="opcion-btn" onclick="toggleOpt(this)">🌉 Puentes bajos</button>
+          <button class="opcion-btn" onclick="toggleOpt(this)">⛰️ Pendientes</button>
+        </div>
+      </div>
+      <button class="btn-ruta" onclick="calcularRuta()">🔍 Calcular Ruta</button>
+
+      <div class="ruta-resultado" id="rutaResultado">
+        <div class="ruta-info">
+          <div class="ruta-dato"><div class="valor" id="rDist">42</div><div class="unidad">km</div></div>
+          <div class="ruta-dato"><div class="valor" id="rTiempo">1h 15m</div><div class="unidad">tiempo estimado</div></div>
+          <div class="ruta-dato"><div class="valor" id="rCaseta">$86</div><div class="unidad">casetas</div></div>
+        </div>
+        <div style="font-size:12px; color:#616161; margin-bottom:6px;">⚠️ Ruta apta para tu vehículo · Sin restricciones activas</div>
+        <button class="btn-iniciar" onclick="iniciarNav()">▶ Iniciar Navegación</button>
+      </div>
+    </div>
+
+    <!-- TAB ALERTAS -->
+    <div class="tab-content" id="content-alertas">
+      <div class="alertas-lista">
+        <div class="alerta-item roja">
+          <div class="alerta-icono">🚫</div>
+          <div class="alerta-texto"><strong>Restricción de peso · Anillo Periférico</strong>Vehículos &gt;20t prohibidos Lun–Vie 6:00–10:00 y 17:00–21:00 hrs</div>
+        </div>
+        <div class="alerta-item amarilla">
+          <div class="alerta-icono">🚧</div>
+          <div class="alerta-texto"><strong>Obra vial · Av. Insurgentes Sur km 14</strong>Carril derecho cerrado. Demora estimada: 20 min</div>
+        </div>
+        <div class="alerta-item roja">
+          <div class="alerta-icono">🌉</div>
+          <div class="alerta-texto"><strong>Restricción de altura · Viaducto Tlalpan</strong>Límite 4.2 m. Vehículos de más altura deben usar ruta alterna</div>
+        </div>
+        <div class="alerta-item naranja">
+          <div class="alerta-icono">🌧️</div>
+          <div class="alerta-texto"><strong>Lluvia intensa · Autopista México–Querétaro</strong>Visibilidad reducida. Se recomienda reducir velocidad</div>
+        </div>
+        <div class="alerta-item azul">
+          <div class="alerta-icono">ℹ️</div>
+          <div class="alerta-texto"><strong>Caseta · Cuota La Venta</strong>Tarifa especial para vehículos de carga: $154. Acepta TAG</div>
+        </div>
+        <div class="alerta-item amarilla">
+          <div class="alerta-icono">⛽</div>
+          <div class="alerta-texto"><strong>Precio combustible · Hoy</strong>Diésel $23.85/L · Gasolina Magna $21.40/L</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB PERFIL VEHÍCULO -->
+    <div class="tab-content" id="content-perfil">
+      <div class="perfil-seccion">
+        <div class="perfil-titulo">Datos del Operador</div>
+        <div class="perfil-campo"><label>Nombre completo</label><input type="text" value="Carlos Mendoza López"></div>
+        <div class="perfil-campo"><label>N° de Licencia</label><input type="text" value="LIC-MX-2024-88432"></div>
+        <div class="perfil-campo"><label>Tipo de Licencia</label>
+          <select><option>Tipo E – Vehículos de carga pesada</option><option>Tipo D – Articulados</option><option>Tipo C – Camiones</option></select></div>
+      </div>
+      <div class="perfil-seccion">
+        <div class="perfil-titulo">Datos del Vehículo</div>
+        <div class="perfil-campo"><label>Tipo de vehículo</label>
+          <select id="tipoVeh" onchange="actualizarRestricciones()">
+            <option>Tráiler / Semirremolque</option>
+            <option>Camión de carga (C2)</option>
+            <option>Autobús de pasajeros</option>
+            <option>Camioneta de carga</option>
+          </select>
+        </div>
+        <div class="campo-row">
+          <div class="perfil-campo"><label>Altura (m)</label><input type="number" id="altura" value="4.5" step="0.1" onchange="actualizarRestricciones()"></div>
+          <div class="perfil-campo"><label>Ancho (m)</label><input type="number" id="ancho" value="2.6" step="0.1"></div>
+        </div>
+        <div class="campo-row">
+          <div class="perfil-campo"><label>Largo (m)</label><input type="number" id="largo" value="18.5" step="0.1"></div>
+          <div class="perfil-campo"><label>Peso bruto (t)</label><input type="number" id="peso" value="48" step="0.5" onchange="actualizarRestricciones()"></div>
+        </div>
+        <div class="perfil-campo"><label>Tipo de carga</label>
+          <select><option>General / Seca</option><option>Materiales peligrosos (HAZMAT)</option><option>Carga refrigerada</option><option>A granel</option><option>Sin carga</option></select>
+        </div>
+        <div class="perfil-campo"><label>Placa del vehículo</label><input type="text" value="ZZ-845-A"></div>
+      </div>
+      <div class="perfil-seccion">
+        <div class="perfil-titulo">Estado de restricciones para tu vehículo</div>
+        <div id="restricciones">
+          <span class="restriccion-badge">🚫 Periférico restringido (Lun–Vie)</span>
+          <span class="restriccion-badge">🚫 Viaducto altura &gt;4.2m</span>
+          <span class="restriccion-badge ok">✅ Autopista federal: sin restricción</span>
+          <span class="restriccion-badge ok">✅ Carretera de cuota: apta</span>
+        </div>
+      </div>
+      <button class="btn-guardar" onclick="guardarPerfil()">💾 Guardar Perfil</button>
+    </div>
+
+    <!-- TAB SERVICIOS -->
+    <div class="tab-content" id="content-servicios">
+      <p style="font-size:13px; color:#616161; margin-bottom:12px;">Toca un servicio para ver los puntos más cercanos en el mapa:</p>
+      <div class="servicios-grid">
+        <div class="servicio-btn" onclick="mostrarServicio('gasolinera')"><div class="servicio-icono">⛽</div><div class="servicio-label">Gasolineras</div></div>
+        <div class="servicio-btn" onclick="mostrarServicio('parador')"><div class="servicio-icono">🏨</div><div class="servicio-label">Paradores</div></div>
+        <div class="servicio-btn" onclick="mostrarServicio('taller')"><div class="servicio-icono">🔧</div><div class="servicio-label">Talleres</div></div>
+        <div class="servicio-btn" onclick="mostrarServicio('descanso')"><div class="servicio-icono">🛏️</div><div class="servicio-label">Áreas de descanso</div></div>
+        <div class="servicio-btn" onclick="mostrarServicio('hospital')"><div class="servicio-icono">🏥</div><div class="servicio-label">Hospitales</div></div>
+        <div class="servicio-btn" onclick="mostrarServicio('caseta')"><div class="servicio-icono">🪙</div><div class="servicio-label">Casetas de cobro</div></div>
+        <div class="servicio-btn" onclick="mostrarServicio('bascula')"><div class="servicio-icono">⚖️</div><div class="servicio-label">Básculas</div></div>
+        <div class="servicio-btn" onclick="mostrarServicio('zona')"><div class="servicio-icono">📦</div><div class="servicio-label">Zonas de carga</div></div>
+      </div>
+
+      <div style="margin-top:14px; padding:12px; background:var(--verde-suave); border-radius:8px;">
+        <div style="font-size:12px; font-weight:700; color:var(--verde-medio); margin-bottom:6px;">📞 Emergencias en carretera</div>
+        <div style="font-size:13px; line-height:1.8;">🆘 Ángeles Verdes: <strong>800-903-9200</strong><br>🚔 Policía Federal: <strong>088</strong><br>🚑 Cruz Roja: <strong>065</strong><br>🔥 Bomberos: <strong>068</strong></div>
+      </div>
+
+      <div style="margin-top:10px; padding:12px; background:#FFF3E0; border-radius:8px; border-left:4px solid var(--naranja);">
+        <div style="font-size:12px; font-weight:700; color:var(--naranja); margin-bottom:4px;">📢 Reportar incidente</div>
+        <div style="font-size:12px; color:#5D4037;">Usa el botón naranja 🔔 en el mapa para reportar accidentes, bloqueos o baches en tiempo real.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAPA -->
+  <div id="mapa"></div>
+
+  <!-- PANEL NAV ACTIVA -->
+  <div class="nav-activa" id="navActiva">
+    <div class="nav-header">
+      <div class="nav-indicacion" id="navIndicacion">⬆️ Continúa por Eje 1 Norte</div>
+      <div class="nav-distancia" id="navDistancia">En 800 m · Incorporación a Periférico</div>
+    </div>
+    <div class="nav-progreso">
+      <div class="progreso-barra"><div class="progreso-fill" id="progFill"></div></div>
+      <div class="nav-datos">
+        <div class="nav-dato"><strong id="navETA">45 min</strong>Tiempo restante</div>
+        <div class="nav-dato"><strong id="navDist">28 km</strong>Distancia</div>
+        <div class="nav-dato"><strong id="navVel">65 km/h</strong>Velocidad</div>
+      </div>
+    </div>
+    <button class="btn-terminar" onclick="terminarNav()">⏹ Terminar navegación</button>
+  </div>
+
+  <!-- BOTON REPORTE -->
+  <div class="reporte-float">
+    <button class="btn-reporte" onclick="abrirReporte()" title="Reportar incidente">🔔</button>
+  </div>
+</div>
+
+<!-- MODAL REPORTE -->
+<div class="modal-overlay" id="modalReporte">
+  <div class="modal">
+    <h3>⚠️ Reportar incidente</h3>
+    <div class="modal-opt" onclick="selReporte(this)">💥 Accidente vial</div>
+    <div class="modal-opt" onclick="selReporte(this)">🚧 Bloqueo / Manifestación</div>
+    <div class="modal-opt" onclick="selReporte(this)">🕳️ Bache peligroso</div>
+    <div class="modal-opt" onclick="selReporte(this)">🚦 Semáforo sin funcionar</div>
+    <div class="modal-opt" onclick="selReporte(this)">🌊 Inundación en vía</div>
+    <div class="modal-opt" onclick="selReporte(this)">🦺 Desgajamiento / Derrumbe</div>
+    <div class="modal-btns">
+      <button class="btn-cancelar" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn-enviar" onclick="enviarReporte()">Enviar reporte</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ MAPA ============
+const mapa = L.map('mapa', { zoomControl: true }).setView([19.432, -99.133], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap contributors', maxZoom: 19
+}).addTo(mapa);
+
+// Marcadores de referencia CDMX
+const puntosRef = [
+  { coords: [19.432, -99.133], nombre: 'Centro Histórico CDMX', tipo: 'ref' },
+  { coords: [19.485, -99.147], nombre: 'Terminal Vallejo (Origen)', tipo: 'origen' },
+  { coords: [19.350, -99.180], nombre: 'Zona Industrial Vallejo', tipo: 'industrial' },
+  { coords: [19.290, -99.160], nombre: 'Central de Abasto', tipo: 'carga' },
+];
+
+const icoOrigen = L.divIcon({ html: '📍', className: '', iconSize: [30,30], iconAnchor:[15,30] });
+const icoDest = L.divIcon({ html: '🏁', className: '', iconSize: [30,30], iconAnchor:[15,30] });
+const icoCaseta = L.divIcon({ html: '🪙', className: '', iconSize: [28,28], iconAnchor:[14,14] });
+const icoAlerta = L.divIcon({ html: '⚠️', className: '', iconSize: [28,28], iconAnchor:[14,14] });
+const icoServicio = L.divIcon({ html: '🔧', className: '', iconSize: [28,28], iconAnchor:[14,14] });
+
+// Marcador origen fijo
+L.marker([19.485, -99.147], {icon: icoOrigen}).addTo(mapa)
+  .bindPopup('<b>📍 Terminal Vallejo</b><br>Punto de origen').openPopup();
+
+// Casetas en CDMX
+const casetas = [
+  { coords: [19.52, -99.17], nombre: 'Caseta La Venta', tarifa: '$154 (carga pesada)' },
+  { coords: [19.41, -99.25], nombre: 'Caseta Tlalpan', tarifa: '$89 (camión C2)' },
+];
+casetas.forEach(c => {
+  L.marker(c.coords, {icon: icoCaseta}).addTo(mapa)
+    .bindPopup(`<div class="caseta-popup"><strong>🪙 ${c.nombre}</strong>Tarifa: ${c.tarifa}<br>Acepta: Efectivo · TAG</div>`);
+});
+
+// Alertas en mapa
+const alertasMapa = [
+  { coords: [19.44, -99.21], desc: '🚧 Obra vial · Insurgentes Sur' },
+  { coords: [19.38, -99.14], desc: '🌉 Restricción altura · Viaducto' },
+];
+alertasMapa.forEach(a => {
+  L.marker(a.coords, {icon: icoAlerta}).addTo(mapa).bindPopup(`<b>${a.desc}</b>`);
+});
+
+let rutaLayer = null;
+let marcadorDest = null;
+
+// Rutas simuladas entre puntos CDMX
+const rutasSimuladas = {
+  'central de abasto': { coords: [[19.485,-99.147],[19.46,-99.155],[19.43,-99.165],[19.38,-99.17],[19.29,-99.16]], dist: 24, tiempo: '58 min', caseta: '$0' },
+  'aeropuerto': { coords: [[19.485,-99.147],[19.48,-99.13],[19.46,-99.08],[19.44,-99.08]], dist: 18, tiempo: '42 min', caseta: '$0' },
+  'vallejo': { coords: [[19.485,-99.147],[19.49,-99.148],[19.495,-99.15]], dist: 2, tiempo: '8 min', caseta: '$0' },
+};
+
+function calcularRuta() {
+  const destino = document.getElementById('destino').value.trim().toLowerCase();
+  if (!destino) { showToast('Por favor ingresa un destino'); return; }
+
+  if (rutaLayer) { mapa.removeLayer(rutaLayer); }
+  if (marcadorDest) { mapa.removeLayer(marcadorDest); }
+
+  let ruta = rutasSimuladas[destino];
+  if (!ruta) {
+    // Ruta genérica a un punto aleatorio en CDMX
+    const lat = 19.2 + Math.random() * 0.4;
+    const lng = -99.3 + Math.random() * 0.3;
+    ruta = {
+      coords: [[19.485,-99.147],[19.46,-99.15],[19.44,-99.14],[lat-0.05,lng+0.05],[lat,lng]],
+      dist: Math.floor(20 + Math.random()*40),
+      tiempo: `${Math.floor(40+Math.random()*60)} min`,
+      caseta: `$${[0,86,154,240][Math.floor(Math.random()*4)]}`
+    };
+  }
+
+  rutaLayer = L.polyline(ruta.coords, { color: '#1B5E20', weight: 6, opacity: 0.85, dashArray: null }).addTo(mapa);
+  marcadorDest = L.marker(ruta.coords[ruta.coords.length-1], {icon: icoDest}).addTo(mapa)
+    .bindPopup(`<b>🏁 Destino: ${document.getElementById('destino').value}</b>`).openPopup();
+  mapa.fitBounds(rutaLayer.getBounds(), { padding: [40,40] });
+
+  document.getElementById('rDist').textContent = ruta.dist + ' km';
+  document.getElementById('rTiempo').textContent = ruta.tiempo;
+  document.getElementById('rCaseta').textContent = ruta.caseta;
+  document.getElementById('rDist').closest('.ruta-dato').querySelector('.valor').textContent = ruta.dist;
+  document.getElementById('rutaResultado').classList.add('show');
+  showToast('✅ Ruta calculada correctamente');
+}
+
+let navInterval = null;
+function iniciarNav() {
+  document.getElementById('navActiva').classList.add('show');
+  showToast('▶ Navegación iniciada');
+  let prog = 5;
+  const indicaciones = [
+    ['⬆️ Continúa por Eje 1 Norte','En 800 m · Incorporación a Periférico'],
+    ['↗️ Incorpora a Periférico Norte','Mantén carril derecho'],
+    ['➡️ Toma la salida Indios Verdes','En 1.2 km · Salida a la derecha'],
+    ['↖️ Gira a la izquierda · Autopista','Peaje en 500 m · $86'],
+    ['⬆️ Continúa por Autopista México-Qro','Velocidad máxima: 80 km/h'],
+  ];
+  let idx = 0;
+  navInterval = setInterval(() => {
+    prog = Math.min(prog + 3, 95);
+    document.getElementById('progFill').style.width = prog + '%';
+    idx = Math.min(Math.floor(prog / 20), indicaciones.length-1);
+    document.getElementById('navIndicacion').textContent = indicaciones[idx][0];
+    document.getElementById('navDistancia').textContent = indicaciones[idx][1];
+    const restante = Math.max(0, 45 - Math.floor(prog*0.45));
+    const distRestante = Math.max(0, 28 - Math.floor(prog*0.28));
+    document.getElementById('navETA').textContent = restante + ' min';
+    document.getElementById('navDist').textContent = distRestante + ' km';
+    document.getElementById('navVel').textContent = (55 + Math.floor(Math.random()*20)) + ' km/h';
+    if (prog >= 95) { clearInterval(navInterval); showToast('🏁 ¡Llegaste a tu destino!'); terminarNav(); }
+  }, 2000);
+}
+
+function terminarNav() {
+  document.getElementById('navActiva').classList.remove('show');
+  if (navInterval) clearInterval(navInterval);
+}
+
+// ============ TABS ============
+function showTab(tab) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('content-' + tab).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+function toggleHistorial() {
+  // Simulación de historial
+  showTab('ruta');
+  showToast('📋 Historial: últimas 3 rutas cargadas');
+}
+
+// ============ SERVICIOS ============
+const serviciosData = {
+  gasolinera: [{ c:[19.48,-99.15], n:'⛽ PEMEX · Vallejo Norte' },{ c:[19.43,-99.18], n:'⛽ PEMEX · Insurgentes' }],
+  parador: [{ c:[19.52,-99.17], n:'🏨 Parador La Venta' }],
+  taller: [{ c:[19.45,-99.14], n:'🔧 Taller Dísel Carretero' },{ c:[19.38,-99.18], n:'🔧 ServTruck CDMX' }],
+  descanso: [{ c:[19.41,-99.23], n:'🛏️ Área de descanso Sur' }],
+  hospital: [{ c:[19.44,-99.13], n:'🏥 Hospital General' }],
+  caseta: [{ c:[19.52,-99.17], n:'🪙 Caseta La Venta' },{ c:[19.41,-99.25], n:'🪙 Caseta Tlalpan' }],
+  bascula: [{ c:[19.46,-99.20], n:'⚖️ Báscula Periférico Norte' }],
+  zona: [{ c:[19.29,-99.16], n:'📦 Central de Abasto' },{ c:[19.49,-99.14], n:'📦 Zona Industrial Vallejo' }],
+};
+let servicioMarkers = [];
+function mostrarServicio(tipo) {
+  servicioMarkers.forEach(m => mapa.removeLayer(m));
+  servicioMarkers = [];
+  const pts = serviciosData[tipo] || [];
+  pts.forEach(p => {
+    const m = L.marker(p.c, {icon: L.divIcon({html: p.n.split(' ')[0], className:'', iconSize:[28,28], iconAnchor:[14,14]})})
+      .addTo(mapa).bindPopup(`<b>${p.n}</b>`).openPopup();
+    servicioMarkers.push(m);
+  });
+  if (pts.length) mapa.setView(pts[0].c, 13);
+  showToast(`Mostrando ${pts.length} punto(s) en el mapa`);
+}
+
+// ============ OPCIONES ============
+function selOpt(btn, grupo) {
+  btn.closest('.opcion-btns').querySelectorAll('.opcion-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+}
+function toggleOpt(btn) { btn.classList.toggle('sel'); }
+
+// ============ PERFIL ============
+function actualizarRestricciones() {
+  const altura = parseFloat(document.getElementById('altura').value) || 0;
+  const peso = parseFloat(document.getElementById('peso').value) || 0;
+  let html = '';
+  if (peso > 20) html += '<span class="restriccion-badge">🚫 Periférico restringido (Lun–Vie pico)</span>';
+  else html += '<span class="restriccion-badge ok">✅ Periférico: sin restricción de peso</span>';
+  if (altura > 4.2) html += '<span class="restriccion-badge">🚫 Viaducto: altura excede 4.2 m</span>';
+  else html += '<span class="restriccion-badge ok">✅ Viaducto: altura permitida</span>';
+  html += '<span class="restriccion-badge ok">✅ Autopista federal: apta</span>';
+  if (peso > 48) html += '<span class="restriccion-badge">🚫 Excede peso máximo legal (48.5 t)</span>';
+  document.getElementById('restricciones').innerHTML = html;
+}
+function guardarPerfil() { showToast('💾 Perfil de vehículo guardado correctamente'); }
+
+// ============ REPORTE ============
+let reporteSeleccionado = null;
+function abrirReporte() { document.getElementById('modalReporte').classList.add('show'); reporteSeleccionado = null; }
+function cerrarModal() { document.getElementById('modalReporte').classList.remove('show'); }
+function selReporte(el) {
+  document.querySelectorAll('.modal-opt').forEach(o => o.style.background='');
+  el.style.background = '#E8F5E9';
+  reporteSeleccionado = el.textContent;
+}
+function enviarReporte() {
+  if (!reporteSeleccionado) { showToast('Selecciona un tipo de incidente'); return; }
+  cerrarModal();
+  showToast(`📡 Reporte enviado: ${reporteSeleccionado}`);
+  // Añadir al mapa
+  const c = mapa.getCenter();
+  L.marker([c.lat, c.lng], {icon: icoAlerta}).addTo(mapa).bindPopup(`<b>⚠️ ${reporteSeleccionado}</b><br><small>Reportado ahora · Verificación pendiente</small>`).openPopup();
+}
+
+// ============ TOAST ============
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+// Enter en input destino
+document.getElementById('destino').addEventListener('keydown', e => { if (e.key === 'Enter') calcularRuta(); });
+
+// Click en mapa para poner destino
+mapa.on('click', function(e) {
+  const destInput = document.getElementById('destino');
+  if (!destInput.value) {
+    destInput.value = `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`;
+    showToast('📍 Destino marcado en el mapa');
+  }
+});
+</script>
+</body>
+</html>
